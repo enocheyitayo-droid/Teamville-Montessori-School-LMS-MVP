@@ -22,7 +22,7 @@ export function classLeaderboard(context:DemoContext,className:string,period:Per
   if(!["teacher","school_admin","guardian"].includes(context.role))throw new Error("permission");
   const allowed=pupils(context);if(!allowed.some(p=>p.class_name===className))throw new Error("permission");
   const table=period==="midterm"?"midterm_scores":"scores",sum=period==="midterm"?"s.score":"s.ca+s.exam";
-  const marks= db().prepare(`SELECT p.id,p.first_name || ' ' || p.last_name AS name,sum(${sum}) AS total,count(*) AS subject_count FROM pupils p JOIN ${table} s ON s.workspace=p.workspace AND s.student_id=p.id WHERE p.workspace=? AND p.class_name=? AND p.status='Active' AND s.state='Published' AND s.subject IN (?,?,?,?) GROUP BY p.id HAVING count(*)=? ORDER BY total DESC,p.first_name,p.last_name,p.id`).all(context.id,className,...subjects,subjects.length) as {id:string;name:string;total:number;subject_count:number}[];
+  const marks= db().prepare(`SELECT p.id,p.first_name || ' ' || p.last_name AS name,sum(${sum}) AS total,count(*) AS subject_count FROM pupils p JOIN ${table} s ON s.workspace=p.workspace AND s.student_id=p.id WHERE p.workspace=? AND p.class_name=? AND p.status='Active' AND s.state='Published' AND s.subject IN (?,?,?,?) GROUP BY p.id,p.first_name,p.last_name HAVING count(*)=? ORDER BY total DESC,p.first_name,p.last_name,p.id`).all(context.id,className,...subjects,subjects.length) as {id:string;name:string;total:number;subject_count:number}[];
   const enrolled=(db().prepare("SELECT count(*) AS n FROM pupils WHERE workspace=? AND class_name=? AND status='Active'").get(context.id,className) as {n:number}).n;
   let position=0,prior:number|undefined;
   const rows=marks.map((m,index)=>{

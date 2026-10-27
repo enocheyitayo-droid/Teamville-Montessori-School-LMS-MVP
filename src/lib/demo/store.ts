@@ -107,7 +107,7 @@ export function pupilScope(context: DemoContext) {
   return context.role === "guardian" ? " AND id='pupil-1'" : context.role === "teacher" ? " AND class_name='Primary 3'" : "";
 }
 export function pupils(context: DemoContext, query = "", className = "") {
-  const rows = db().prepare(`SELECT * FROM pupils WHERE workspace=? ${pupilScope(context)} AND (first_name || ' ' || last_name || ' ' || admission) LIKE ? AND (?='' OR class_name=?) ORDER BY first_name`).all(context.id,`%${query}%`,className,className) as Pupil[];
+  const rows = db().prepare(`SELECT * FROM pupils WHERE workspace=? ${pupilScope(context)} AND lower(first_name || ' ' || last_name || ' ' || admission) LIKE lower(?) AND (?='' OR class_name=?) ORDER BY first_name`).all(context.id,`%${query}%`,className,className) as Pupil[];
   // node:sqlite returns null-prototype rows; React client props need plain objects.
   return rows.map(row => ({ ...row }));
 }
