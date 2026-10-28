@@ -79,30 +79,49 @@ const seedPupils = [
   ["Zion","Ajayi","Nursery 1","Mrs Ajayi"], ["Mide","Taiwo","Nursery 1","Mr Taiwo"], ["Ella","Udo","Nursery 2","Mrs Udo"], ["Timilehin","Oni","Nursery 2","Mr Oni"], ["Kiki","Sanni","Nursery 2","Mrs Sanni"],
 ];
 export async function createDemo(role: DemoRole) {
-  const id = randomUUID(), token = randomBytes(32).toString("hex");
-  const expires = new Date(Date.now()+7*86400000);
-  transaction(() => {
+  const id=randomUUID(),token=randomBytes(32).toString("hex"),expires=new Date(Date.now()+7*86400000),date=schoolDate();
+  const pupilRows:(string|number)[][]=[],chargeRows:(string|number)[][]=[],paymentRows:(string|number)[][]=[],attendanceRows:(string|number)[][]=[],scoreRows:(string|number)[][]=[],versionRows:(string|number)[][]=[];
+  seedPupils.forEach(([first,last,className,guardian],index)=>{
+    const studentId="pupil-"+(index+1),state=index%3===0?"Published":index%3===1?"Submitted":"Draft";
+    pupilRows.push([studentId,id,"TV/2026/"+String(index+1).padStart(3,"0"),first,last,className,guardian]);
+    for(const [category,amount] of [["Tuition",10000000],["Learning materials",1500000],["Activities",500000]] as const)chargeRows.push([randomUUID(),id,studentId,category,amount]);
+    const paid=[12000000,8000000,12000000,6000000,0][index%5];
+    if(paid)paymentRows.push([randomUUID(),id,studentId,paid,"Bank transfer","DEMO-SEED-"+(index+1),"Verified","TV-DEMO-"+String(index+1).padStart(4,"0")]);
+    attendanceRows.push([id,studentId,date,index===4||index===12?"Absent":index===7?"Late":"Present","Demonstration seed"]);
+    const scores=subjects.map((subject,subjectIndex)=>({subject,ca:25+(index+subjectIndex)%15,exam:35+(index*3+subjectIndex)%25,version:1}));
+    for(const score of scores)scoreRows.push([id,studentId,score.subject,score.ca,score.exam,state]);
+    if(state==="Published")versionRows.push([randomUUID(),id,studentId,JSON.stringify(scores.sort((a,b)=>a.subject.localeCompare(b.subject)))]);
+  });
+  // Internal table/column constants only. Values remain parameterised, in one
+  // atomic transaction; seeding no longer requires hundreds of network trips.
+  const insert=(table:string,columns:string,rows:(string|number)[][])=>{
+    if(!rows.length)return;
+    const placeholders=rows.map(row=>"("+row.map(()=>"?").join(",")+")").join(",");
+    db().prepare("INSERT INTO "+table+"("+columns+") VALUES "+placeholders).run(...rows.flat());
+  };
+  transaction(()=>{
     db().prepare("DELETE FROM workspaces WHERE expires_at < ?").run(new Date().toISOString());
     db().prepare("INSERT INTO workspaces VALUES(?,?,?,?)").run(id,hash(token),role,expires.toISOString());
-    seedPupils.forEach(([first,last,className,guardian],index) => {
-      const studentId = `pupil-${index+1}`;
-      db().prepare("INSERT INTO pupils(id,workspace,admission,first_name,last_name,class_name,guardian) VALUES(?,?,?,?,?,?,?)").run(studentId,id,`TV/2026/${String(index+1).padStart(3,"0")}`,first,last,className,guardian);
-      for (const [category,amount] of [["Tuition",10000000],["Learning materials",1500000],["Activities",500000]] as const) db().prepare("INSERT INTO charges VALUES(?,?,?,?,?)").run(randomUUID(),id,studentId,category,amount);
-      const paid = [12000000,8000000,12000000,6000000,0][index%5];
-      if (paid) db().prepare("INSERT INTO payments(id,workspace,student_id,amount,method,reference,status,receipt) VALUES(?,?,?,?,?,?,'Verified',?)").run(randomUUID(),id,studentId,paid,"Bank transfer",`DEMO-SEED-${index+1}`,`TV-DEMO-${String(index+1).padStart(4,"0")}`);
-      const status = index === 4 || index === 12 ? "Absent" : index === 7 ? "Late" : "Present";
-      db().prepare("INSERT INTO attendance(workspace,student_id,school_date,status,recorded_by) VALUES(?,?,?,?,?)").run(id,studentId,schoolDate(),status,"Demonstration seed");
-      subjects.forEach((subject,subjectIndex) => db().prepare("INSERT INTO scores(workspace,student_id,subject,ca,exam,state) VALUES(?,?,?,?,?,?)").run(id,studentId,subject,25+(index+subjectIndex)%15,35+(index*3+subjectIndex)%25,index%3===0 ? "Published" : index%3===1 ? "Submitted" : "Draft"));
-      if (index % 3 === 0) {
-        const snapshot = db().prepare("SELECT subject,ca,exam,version FROM scores WHERE workspace=? AND student_id=? ORDER BY subject").all(id,studentId);
-        db().prepare("INSERT INTO result_versions(id,workspace,student_id,snapshot) VALUES(?,?,?,?)").run(randomUUID(),id,studentId,JSON.stringify(snapshot));
-      }
-    });
-    [["Welcome to a new term","Our demonstration workspace is ready. Explore admissions, attendance, learning, and finance with fictional records."],["Parent–teacher conversations","Sample notice: book a time with your child’s class teacher to discuss learning progress."],["A note on school fees","Sample notice: view your fee statement in the parent portal. Offline payments are credited only after verification."]].forEach(([title,message]) => db().prepare("INSERT INTO notices VALUES(?,?,?,?,CURRENT_TIMESTAMP)").run(randomUUID(),id,title,message));
+    insert("pupils","id,workspace,admission,first_name,last_name,class_name,guardian",pupilRows);
+    insert("charges","id,workspace,student_id,category,amount",chargeRows);
+    insert("payments","id,workspace,student_id,amount,method,reference,status,receipt",paymentRows);
+    insert("attendance","workspace,student_id,school_date,status,recorded_by",attendanceRows);
+    insert("scores","workspace,student_id,subject,ca,exam,state",scoreRows);
+    insert("result_versions","id,workspace,student_id,snapshot",versionRows);
+    insert("notices","id,workspace,title,message",[
+      ["Welcome to a new term","Our demonstration workspace is ready. Explore admissions, attendance, learning, and finance with fictional records."],
+      ["Parent–teacher conversations","Sample notice: book a time with your child’s class teacher to discuss learning progress."],
+      ["A note on school fees","Sample notice: view your fee statement in the parent portal. Offline payments are credited only after verification."]
+    ].map(([title,message])=>[randomUUID(),id,title,message]));
+    insert("staff","workspace,id,name,title",[
+      [id,"staff-1","Mrs Demo Adeola","Primary 3 teacher"],[id,"staff-2","Mr Demo Chidi","Primary 1 teacher"],[id,"staff-3","Mrs Demo Bisi","Nursery teacher"]
+    ]);
+    insert("staff_payroll","workspace,staff_id,monthly_amount",[[id,"staff-1",12000000],[id,"staff-2",11000000],[id,"staff-3",10000000]]);
     log({id,role,expires_at:expires.toISOString()},"Demonstration workspace created with fictional records");
   });
-  (await cookies()).set("teamville_demo", token, { httpOnly:true,secure:process.env.NODE_ENV==="production",sameSite:"lax",path:"/demo",expires });
+  (await cookies()).set("teamville_demo",token,{httpOnly:true,secure:process.env.NODE_ENV==="production",sameSite:"lax",path:"/demo",expires});
 }
+
 export function pupilScope(context: DemoContext) {
   return context.role === "guardian" ? " AND id='pupil-1'" : context.role === "teacher" ? " AND class_name='Primary 3'" : "";
 }
@@ -120,5 +139,14 @@ export function statement(context: DemoContext, studentId: string) {
   const payments = db().prepare("SELECT * FROM payments WHERE workspace=? AND student_id=? ORDER BY created_at DESC").all(context.id,studentId) as Payment[];
   const billed = charges.reduce((sum,c)=>sum+c.amount,0), paid = payments.filter(p=>p.status==="Verified").reduce((sum,p)=>sum+p.amount,0);
   return {charges,payments,billed,paid,balance:billed-paid};
+}
+// Read totals in batches rather than three database trips for every pupil.
+// Always build the returned list from the caller's authorised pupil scope.
+export function feeAccounts(context:DemoContext,query="",className=""){
+  const register=pupils(context,query,className);
+  const charges=db().prepare("SELECT student_id,sum(amount) AS amount FROM charges WHERE workspace=? GROUP BY student_id").all(context.id) as {student_id:string;amount:number}[];
+  const payments=db().prepare("SELECT student_id,sum(amount) AS amount FROM payments WHERE workspace=? AND status='Verified' GROUP BY student_id").all(context.id) as {student_id:string;amount:number}[];
+  const billedByPupil=new Map(charges.map(row=>[row.student_id,row.amount])),paidByPupil=new Map(payments.map(row=>[row.student_id,row.amount]));
+  return register.map(pupil=>{const billed=billedByPupil.get(pupil.id)??0,paid=paidByPupil.get(pupil.id)??0;return {pupil,billed,paid,balance:billed-paid};});
 }
 export function money(kobo: number) { return new Intl.NumberFormat("en-NG", { style:"currency",currency:"NGN",maximumFractionDigits:0 }).format(kobo/100); }

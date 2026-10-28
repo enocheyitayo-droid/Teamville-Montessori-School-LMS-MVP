@@ -9,7 +9,7 @@ vi.mock("next/headers",()=>({cookies:async()=>({get:(name:string)=>jar.has(name)
 vi.mock("next/navigation",()=>({redirect:(path:string)=>{throw new Error(`REDIRECT:${path}`);},notFound:()=>{throw new Error("NOT_FOUND");}}));
 vi.mock("next/cache",()=>({revalidatePath:()=>undefined}));
 
-import { createDemo, db, demoContext, findPupil, pupils, requireDemo, schoolDate, statement, subjects } from "@/lib/demo/store";
+import { createDemo, db, demoContext, feeAccounts, findPupil, pupils, requireDemo, schoolDate, statement, subjects } from "@/lib/demo/store";
 import { admitPupil, changeResultState, recordPayment, saveAttendance, saveScores, switchDemoRole, verifyPayment } from "@/lib/demo/actions";
 import { addCharge,addFunding,approveDisbursement,payDisbursement,requestDisbursement,uploadResults } from "@/lib/demo/extended-actions";
 import { cashbook,debtors,purse } from "@/lib/demo/finance";
@@ -25,6 +25,17 @@ beforeEach(async()=>{jar.clear();await createDemo("school_admin");});
 afterAll(()=>{db().close();rmSync(directory,{recursive:true,force:true});});
 
 describe("demo isolation and authorisation",()=>{
+  it("batch fee totals match detailed accounts and exclude pending payments",async()=>{
+    const context=(await demoContext())!;
+    db().prepare("INSERT INTO payments(id,workspace,student_id,amount,method,reference,status) VALUES(?,?,?,?,?,?,?)").run("pending-batch-test",context.id,"pupil-2",100000,"Cash","PENDING-BATCH","Pending");
+    const summaries=feeAccounts(context);
+    expect(summaries).toHaveLength(20);
+    for(const account of summaries){const detailed=statement(context,account.pupil.id)!;expect([account.billed,account.paid,account.balance]).toEqual([detailed.billed,detailed.paid,detailed.balance]);}
+    await changeRole("guardian");
+    expect(feeAccounts((await demoContext())!).map(account=>account.pupil.id)).toEqual(["pupil-1"]);
+    await changeRole("teacher");
+    expect(feeAccounts((await demoContext())!).every(account=>account.pupil.class_name==="Primary 3")).toBe(true);
+  });
   it("isolates every demo workspace even when pupil IDs are identical",async()=>{
     const a=(await demoContext())!,tokenA=jar.get("teamville_demo")!;
     db().prepare("UPDATE pupils SET first_name='Workspace A' WHERE workspace=? AND id='pupil-1'").run(a.id);

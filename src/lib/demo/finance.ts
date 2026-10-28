@@ -1,14 +1,16 @@
 import "server-only";
-import { db,pupils,statement,type DemoContext } from "./store";
+import { db,feeAccounts,type DemoContext } from "./store";
 export type Obligation={id:string;kind:string;payee:string;staff_id:string|null;period:string|null;description:string;amount:number;reference:string;requested_role:string;status:string;approved_role:string|null;paid_at:string|null;voucher:string|null;created_at:string};
 export function ensureStaff(context:DemoContext){
   // Backfills existing demo workspaces as well as new walkthroughs.
+  const ready=db().prepare("SELECT count(*) AS n FROM staff s JOIN staff_payroll p ON p.workspace=s.workspace AND p.staff_id=s.id WHERE s.workspace=? AND s.id IN ('staff-1','staff-2','staff-3')").get(context.id) as {n:number};
+  if(ready.n===3)return;
   for(const [id,name,title] of [["staff-1","Mrs Demo Adeola","Primary 3 teacher"],["staff-2","Mr Demo Chidi","Primary 1 teacher"],["staff-3","Mrs Demo Bisi","Nursery teacher"]]) db().prepare("INSERT OR IGNORE INTO staff VALUES(?,?,?,?)").run(context.id,id,name,title);
   for(const [id,amount] of [["staff-1",12000000],["staff-2",11000000],["staff-3",10000000]] as const) db().prepare("INSERT OR IGNORE INTO staff_payroll VALUES(?,?,?)").run(context.id,id,amount);
 }
 export function debtors(context:DemoContext,className="",query="",status="all"){
   if(!["school_admin","bursar"].includes(context.role))throw new Error("permission");
-  return pupils(context,query,className).map(p=>({pupil:p,...statement(context,p.id)!})).filter(a=>a.balance>0&&(status!=="unpaid"||a.paid===0)&&(status!=="part"||a.paid>0));
+  return feeAccounts(context,query,className).filter(a=>a.balance>0&&(status!=="unpaid"||a.paid===0)&&(status!=="part"||a.paid>0));
 }
 export function purse(context:DemoContext){
   const total=(sql:string)=>(db().prepare(sql).get(context.id) as {n:number}).n;

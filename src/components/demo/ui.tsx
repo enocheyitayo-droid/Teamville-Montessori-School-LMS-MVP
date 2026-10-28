@@ -13,5 +13,5 @@ export function Feedback({ error,success }: {error?:string;success?:string}) {
 }
 export function Status({ children }: {children:string}) { return <span className={`status status-${children.toLowerCase().replaceAll(" ","-")}`}>{children}</span>; }
 export function Amount({ value }: {value:number}) { return <span className="amount">{money(value)}</span>; }
-export function Empty({ text,href,label }: {text:string;href?:string;label?:string}) { return <div className="empty-state"><Search size={28}/><p>{text}</p>{href&&<Link className="text-link" href={href}>{label}<ArrowRight size={14}/></Link>}</div>; }
+export function Empty({ text,href,label }: {text:string;href?:string;label?:string}) { return <div className="empty-state"><Search size={28}/><p>{text}</p>{href&&<Link prefetch={false} className="text-link" href={href}>{label}<ArrowRight size={14}/></Link>}</div>; }
 export function DemoPanel({title,description,children,action}: {title:string;description?:string;children:React.ReactNode;action?:React.ReactNode}) { return <section className="panel demo-panel"><div className="panel-heading"><div><h3>{title}</h3>{description&&<p>{description}</p>}</div>{action}</div>{children}</section>; }
