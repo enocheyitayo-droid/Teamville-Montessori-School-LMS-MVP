@@ -6,12 +6,11 @@ The main URL now opens the public school introduction. `/portal` is the demo acc
 
 Public layout: school introduction, values, about, nursery/primary learning stages, admissions steps, gallery, portal introduction, contact/FAQ and footer. Navigation, photo filters, native gallery dialog and mobile menu are interactive. Contact details, testimonials, admission dates, facilities and examination statistics have not been invented.
 
-Temporary photographs are explicitly labelled, locally served and credited:
+The six Teamville images supplied by the user on 28 October 2026 replace all stock photography. Originals are copied unchanged into `public/school/`: the Class of 2026 group photo, pupils with a staff member, early-years graduation, stage performance, cap-throw celebration and the 2026/2027 admissions flyer. The TikTok browser screenshot is used only as a reference for contact details; browser chrome and unrelated tabs are not published.
 
-- `public/school/children-learning.jpg`: Annie Spratt, https://unsplash.com/photos/WwSX_X4GrAA
-- `public/school/classroom.jpg`: Doug Linstedt, https://unsplash.com/photos/jEEYZsaxbH4
+The hero uses the Class of 2026 group photo. The admissions flyer is displayed uncropped and links to its full-size original. Gallery cards open the full photograph in a dialog, preserving its aspect ratio. CSS controls only the displayed card framing.
 
-Replace these with approved Teamville photographs and update the descriptions/credits in `src/components/school-website.tsx`. The supplied official logo remains `public/brand/teamville-logo.png`. Confirm the school's telephone, email and street address before replacing the contact note.
+The supplied profile screenshot lists Bodija, Ibadan, telephone `0803 854 8782` and TikTok `@teamville_montessorisch`; the website now has `tel:+2348038548782` and the school profile link. No email or street address was inferred. The official logo remains `public/brand/teamville-logo.png`.
 
 ## Checks
 
